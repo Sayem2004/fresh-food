@@ -8,6 +8,9 @@ import {
 
 import { Role } from '../../common/enums/role.enum';
 import { Status } from '../../common/enums/status.enum';
+import { Exclude } from 'class-transformer';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
 @Entity('users')
 export class User {
@@ -27,6 +30,7 @@ export class User {
   })
   phone!: string;
 
+  @Exclude()
   @Column()
   password!: string;
 
