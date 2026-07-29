@@ -56,4 +56,11 @@ export class UsersService {
     // Return user without password
     return this.removePassword(savedUser);
   }
+
+  // Find user by email (Used for Login)
+  async findByEmail(email: string) {
+    return await this.userRepository.findOne({
+      where: { email },
+    });
+  }
 }
