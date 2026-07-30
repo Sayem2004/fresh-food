@@ -6,39 +6,27 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-import { Role } from '../../common/enums/role.enum';
 import { Status } from '../../common/enums/status.enum';
-import { Exclude } from 'class-transformer';
 
-
-@Entity('users')
-export class User {
+@Entity('categories')
+export class Category {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({
+    unique: true,
+  })
   name!: string;
 
   @Column({
-    unique: true,
+    nullable: true,
   })
-  email!: string;
+  description!: string;
 
   @Column({
-    unique: true,
+    nullable: true,
   })
-  phone!: string;
-
-  @Exclude()
-  @Column()
-  password!: string;
-
-  @Column({
-    type: 'enum',
-    enum: Role,
-    default: Role.CUSTOMER,
-  })
-  role!: Role;
+  image!: string;
 
   @Column({
     type: 'enum',
@@ -46,14 +34,6 @@ export class User {
     default: Status.ACTIVE,
   })
   status!: Status;
-
-  @Column()
-  address!: string;
-
-  @Column({
-    nullable: true,
-  })
-  image!: string;
 
   @CreateDateColumn()
   createdAt!: Date;

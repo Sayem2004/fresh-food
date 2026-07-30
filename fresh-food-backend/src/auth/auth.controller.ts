@@ -33,7 +33,7 @@ export class AuthController {
         return {
             message: 'Profile fetched successfully',
             user: req.user,
-        };
+        }; 
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
