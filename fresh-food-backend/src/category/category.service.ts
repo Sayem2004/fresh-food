@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class CategoryService {
@@ -36,5 +37,53 @@ export class CategoryService {
                 id: 'ASC',
             },
         });
+    }
+    async update(
+        id: number,
+        updateCategoryDto: UpdateCategoryDto,
+    ) {
+        const category = await this.categoryRepository.findOne({
+            where: { id },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category not found');
+        }
+
+        if (
+            updateCategoryDto.name &&
+            updateCategoryDto.name !== category.name
+        ) {
+            const exists = await this.categoryRepository.findOne({
+                where: {
+                    name: updateCategoryDto.name,
+                },
+            });
+
+            if (exists) {
+                throw new BadRequestException(
+                    'Category name already exists',
+                );
+            }
+        }
+
+        Object.assign(category, updateCategoryDto);
+
+        return await this.categoryRepository.save(category);
+    }
+    async remove(id: number) {
+        const category = await this.categoryRepository.findOne({
+            where: { id },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category not found');
+        }
+
+        await this.categoryRepository.remove(category);
+
+        return {
+            message: 'Category deleted successfully',
+        };
     }
 }
