@@ -9,6 +9,8 @@ import {
 
 import { Category } from '../../category/entities/category.entity';
 import { Status } from '../../common/enums/status.enum';
+import { OneToMany } from 'typeorm';
+import { Cart } from '../../cart/entities/cart.entity';
 
 @Entity('products')
 export class Product {
@@ -61,6 +63,12 @@ export class Product {
     },
   )
   category!: Category;
+
+  @OneToMany(
+    () => Cart,
+    (cart) => cart.product,
+  )
+  carts!: Cart[];
 
   @CreateDateColumn()
   createdAt!: Date;
