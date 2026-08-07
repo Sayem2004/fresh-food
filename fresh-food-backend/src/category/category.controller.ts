@@ -7,6 +7,7 @@ import {
     ParseIntPipe,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 
@@ -49,5 +50,18 @@ export class CategoryController {
     @Roles('ADMIN')
     async remove(@Param('id', ParseIntPipe) id: number) {
         return await this.categoryService.remove(id);
+    }
+    @Get('search')
+    async search(
+        @Query('name') name: string,
+    ) {
+        return await this.categoryService.search(name);
+    }
+
+    @Get(':id')
+    async findOne(
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return await this.categoryService.findOne(id);
     }
 }
