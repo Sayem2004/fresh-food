@@ -3,13 +3,12 @@ import {
     Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like, ILike } from 'typeorm';
 
 import { Product } from './entities/product.entity';
 import { Category } from '../category/entities/category.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Like } from 'typeorm';
 
 @Injectable()
 export class ProductService {
@@ -21,10 +20,14 @@ export class ProductService {
         private readonly categoryRepository: Repository<Category>,
     ) { }
 
+    // ===========================
+    // Create Product
+    // ===========================
     async create(createProductDto: CreateProductDto) {
         const { categoryId, ...productData } = createProductDto;
 
-        // Check Category
+        const productName = createProductDto.name.trim();
+
         const category = await this.categoryRepository.findOne({
             where: { id: categoryId },
         });
@@ -33,14 +36,33 @@ export class ProductService {
             throw new BadRequestException('Category not found');
         }
 
+        const existingProduct = await this.productRepository.findOne({
+            where: {
+                name: ILike(productName),
+                category: {
+                    id: categoryId,
+                },
+            },
+        });
+
+        if (existingProduct) {
+            throw new BadRequestException(
+                'Product already exists in this category',
+            );
+        }
+
         const product = this.productRepository.create({
             ...productData,
+            name: productName,
             category,
         });
 
         return await this.productRepository.save(product);
     }
 
+    // ===========================
+    // Get All Products
+    // ===========================
     async findAll(
         page = 1,
         limit = 10,
@@ -48,6 +70,21 @@ export class ProductService {
         sort = 'id',
         order: 'ASC' | 'DESC' = 'ASC',
     ) {
+
+        const allowedSortFields = [
+            'id',
+            'name',
+            'price',
+            'stock',
+            'createdAt',
+        ];
+
+        if (!allowedSortFields.includes(sort)) {
+            throw new BadRequestException(
+                `Invalid sort field. Allowed fields: ${allowedSortFields.join(', ')}`,
+            );
+        }
+
         const where = categoryId
             ? {
                 category: {
@@ -75,6 +112,9 @@ export class ProductService {
         };
     }
 
+    // ===========================
+    // Get Single Product
+    // ===========================
     async findOne(id: number) {
         const product = await this.productRepository.findOne({
             where: { id },
@@ -86,33 +126,79 @@ export class ProductService {
 
         return product;
     }
+
+    // ===========================
+    // Update Product
+    // ===========================
     async update(id: number, updateProductDto: UpdateProductDto) {
         const product = await this.productRepository.findOne({
             where: { id },
+            relations: {
+                category: true,
+            },
         });
 
         if (!product) {
             throw new BadRequestException('Product not found');
         }
 
+        let category = product.category;
+
         if (updateProductDto.categoryId) {
-            const category = await this.categoryRepository.findOne({
-                where: { id: updateProductDto.categoryId },
+            const newCategory = await this.categoryRepository.findOne({
+                where: {
+                    id: updateProductDto.categoryId,
+                },
             });
 
-            if (!category) {
+            if (!newCategory) {
                 throw new BadRequestException('Category not found');
             }
 
-            product.category = category;
+            category = newCategory;
         }
 
-        const { categoryId, ...productData } = updateProductDto;
+        if (updateProductDto.name) {
+            const productName = updateProductDto.name.trim();
+
+            const existingProduct =
+                await this.productRepository.findOne({
+                    where: {
+                        name: ILike(productName),
+                        category: {
+                            id: category.id,
+                        },
+                    },
+                });
+
+            if (
+                existingProduct &&
+                existingProduct.id !== id
+            ) {
+                throw new BadRequestException(
+                    'Product already exists in this category',
+                );
+            }
+
+            product.name = productName;
+        }
+
+        product.category = category;
+
+        const {
+            categoryId,
+            name,
+            ...productData
+        } = updateProductDto;
 
         Object.assign(product, productData);
 
         return await this.productRepository.save(product);
     }
+
+    // ===========================
+    // Delete Product
+    // ===========================
     async remove(id: number) {
         const product = await this.productRepository.findOne({
             where: { id },
@@ -128,15 +214,24 @@ export class ProductService {
             message: 'Product deleted successfully',
         };
     }
+
+    // ===========================
+    // Search Product
+    // ===========================
     async search(name: string) {
-        return await this.productRepository.find({
+        const products = await this.productRepository.find({
             where: {
-                name: Like(`%${name}%`),
+                name: ILike(`%${name}%`),
             },
             order: {
-                id: 'ASC',
+                name: 'ASC',
             },
         });
-    }
 
+        if (products.length === 0) {
+            throw new BadRequestException('No product found');
+        }
+
+        return products;
+    }
 }
