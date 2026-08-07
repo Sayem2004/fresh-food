@@ -9,6 +9,8 @@ import {
 import { Role } from '../../common/enums/role.enum';
 import { Status } from '../../common/enums/status.enum';
 import { Exclude } from 'class-transformer';
+import { OneToMany } from 'typeorm';
+import { Cart } from '../../cart/entities/cart.entity';
 
 
 @Entity('users')
@@ -60,4 +62,10 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @OneToMany(
+    () => Cart,
+    (cart) => cart.user,
+  )
+  carts!: Cart[];
 }
