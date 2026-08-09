@@ -11,6 +11,7 @@ import { Status } from '../../common/enums/status.enum';
 import { Exclude } from 'class-transformer';
 import { OneToMany } from 'typeorm';
 import { Cart } from '../../cart/entities/cart.entity';
+import { Order } from '../../order/entities/order.entity';
 
 
 @Entity('users')
@@ -68,4 +69,12 @@ export class User {
     (cart) => cart.user,
   )
   carts!: Cart[];
+
+  @OneToMany(
+    () => Order,
+    (order) => order.user,
+)
+orders!: Order[];
+
+
 }
