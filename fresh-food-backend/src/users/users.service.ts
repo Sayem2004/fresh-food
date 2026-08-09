@@ -11,13 +11,22 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   private removePassword(user: any) {
     if (!user) return user;
 
     const { password, ...rest } = user;
     return rest;
+  }
+
+  async findAll() {
+    const users = await this.userRepository.find();
+
+    return users.map((user) => {
+      const { password, ...result } = user;
+      return result;
+    });
   }
 
   async register(createUserDto: CreateUserDto) {
