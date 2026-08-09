@@ -18,6 +18,8 @@ import { OrderStatus } from './enums/order-status.enum';
 import { PaymentStatus } from './enums/payment-status.enum';
 import { DeliveryStatus } from './enums/delivery-status.enum';
 import { Product } from '../product/entities/product.entity';
+import { Role } from '../common/enums/role.enum';
+
 
 @Injectable()
 export class OrderService {
@@ -375,90 +377,257 @@ export class OrderService {
         };
     }
     async getAllOrders() {
-    const orders = await this.orderRepository.find({
-        relations: {
-            user: true,
-            items: {
-                product: true,
+        const orders = await this.orderRepository.find({
+            relations: {
+                user: true,
+                items: {
+                    product: true,
+                },
             },
-        },
-        order: {
-            createdAt: 'DESC',
-        },
-    });
-
-    return {
-        message: 'Orders retrieved successfully',
-        totalOrders: orders.length,
-
-        orders: orders.map((order) => ({
-            id: order.id,
-            orderNumber: order.orderNumber,
-
-            customer: {
-                id: order.user.id,
-                name: order.user.name,
-                email: order.user.email,
-                phone: order.user.phone,
+            order: {
+                createdAt: 'DESC',
             },
+        });
 
-            status: order.status,
+        return {
+            message: 'Orders retrieved successfully',
+            totalOrders: orders.length,
 
-            paymentMethod: order.paymentMethod,
-            paymentStatus: order.paymentStatus,
+            orders: orders.map((order) => ({
+                id: order.id,
+                orderNumber: order.orderNumber,
 
-            deliveryStatus: order.deliveryStatus,
+                customer: {
+                    id: order.user.id,
+                    name: order.user.name,
+                    email: order.user.email,
+                    phone: order.user.phone,
+                },
 
-            subtotal: order.subtotal,
-            discount: order.discount,
-            shippingCost: order.shippingCost,
-            totalAmount: order.totalAmount,
+                status: order.status,
 
-            shippingAddress: order.shippingAddress,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
 
-            createdAt: order.createdAt,
+                deliveryStatus: order.deliveryStatus,
 
-            items: order.items.map((item) => ({
-                id: item.id,
-                productName: item.productName,
-                price: item.price,
-                quantity: item.quantity,
-                subtotal: item.subtotal,
+                subtotal: order.subtotal,
+                discount: order.discount,
+                shippingCost: order.shippingCost,
+                totalAmount: order.totalAmount,
+
+                shippingAddress: order.shippingAddress,
+
+                createdAt: order.createdAt,
+
+                items: order.items.map((item) => ({
+                    id: item.id,
+                    productName: item.productName,
+                    price: item.price,
+                    quantity: item.quantity,
+                    subtotal: item.subtotal,
+                })),
             })),
-        })),
-    };
-}
-async updateOrderStatus(
-    orderId: number,
-    status: OrderStatus,
-) {
-    const order = await this.orderRepository.findOne({
-        where: {
-            id: orderId,
-        },
-    });
+        };
+    }
+    async updateOrderStatus(
+        orderId: number,
+        status: OrderStatus,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+            },
+        });
 
-    if (!order) {
-        throw new BadRequestException(
-            'Order not found',
-        );
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found',
+            );
+        }
+
+        order.status = status;
+
+        const updatedOrder =
+            await this.orderRepository.save(order);
+
+        return {
+            message: 'Order status updated successfully',
+            order: {
+                id: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                status: updatedOrder.status,
+                paymentStatus: updatedOrder.paymentStatus,
+                deliveryStatus: updatedOrder.deliveryStatus,
+                totalAmount: updatedOrder.totalAmount,
+            },
+        };
+    }
+    async assignDeliveryMan(
+        orderId: number,
+        deliveryManId: number,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found',
+            );
+        }
+
+        const deliveryMan =
+            await this.userRepository.findOne({
+                where: {
+                    id: deliveryManId,
+                },
+            });
+
+        if (!deliveryMan) {
+            throw new BadRequestException(
+                'Delivery man not found',
+            );
+        }
+
+        if (deliveryMan.role !== Role.DELIVERYMAN) {
+            throw new BadRequestException(
+                'Selected user is not a delivery man',
+            );
+        }
+
+        if (deliveryMan.status !== 'ACTIVE') {
+            throw new BadRequestException(
+                'Delivery man is inactive',
+            );
+        }
+
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException(
+                'Cancelled order cannot be assigned',
+            );
+        }
+
+        order.deliveryManId = deliveryMan.id;
+        order.deliveryStatus = DeliveryStatus.ASSIGNED;
+
+        const updatedOrder =
+            await this.orderRepository.save(order);
+
+        return {
+            message: 'Delivery man assigned successfully',
+
+            order: {
+                id: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                deliveryManId:
+                    updatedOrder.deliveryManId,
+                deliveryStatus:
+                    updatedOrder.deliveryStatus,
+            },
+        };
     }
 
-    order.status = status;
+    async getDeliveryOrders(deliveryManId: number) {
+        const orders = await this.orderRepository.find({
+            where: {
+                deliveryManId,
+            },
+            relations: {
+                items: true,
+            },
+            order: {
+                createdAt: 'DESC',
+            },
+        });
 
-    const updatedOrder =
-        await this.orderRepository.save(order);
+        return {
+            message: 'Assigned orders retrieved successfully',
+            orders: orders.map((order) => ({
+                id: order.id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                deliveryStatus: order.deliveryStatus,
+                totalAmount: order.totalAmount,
+                shippingAddress: order.shippingAddress,
+                createdAt: order.createdAt,
+                items: order.items.map((item) => ({
+                    productName: item.productName,
+                    price: item.price,
+                    quantity: item.quantity,
+                    subtotal: item.subtotal,
+                })),
+            })),
+        };
+    }
 
-    return {
-        message: 'Order status updated successfully',
-        order: {
-            id: updatedOrder.id,
-            orderNumber: updatedOrder.orderNumber,
-            status: updatedOrder.status,
-            paymentStatus: updatedOrder.paymentStatus,
-            deliveryStatus: updatedOrder.deliveryStatus,
-            totalAmount: updatedOrder.totalAmount,
-        },
-    };
-}
+    async updateDeliveryStatus(
+        deliveryManId: number,
+        orderId: number,
+        deliveryStatus: DeliveryStatus,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Order not found');
+        }
+
+        // Check whether this order belongs to this delivery man
+        if (order.deliveryManId !== deliveryManId) {
+            throw new BadRequestException(
+                'This order is not assigned to you',
+            );
+        }
+
+        // Status flow validation
+        const currentStatus = order.deliveryStatus;
+
+        if (
+            currentStatus === DeliveryStatus.ASSIGNED &&
+            deliveryStatus !== DeliveryStatus.PICKED_UP
+        ) {
+            throw new BadRequestException(
+                'Order must be picked up first',
+            );
+        }
+
+        if (
+            currentStatus === DeliveryStatus.PICKED_UP &&
+            deliveryStatus !== DeliveryStatus.OUT_FOR_DELIVERY
+        ) {
+            throw new BadRequestException(
+                'Order must be out for delivery next',
+            );
+        }
+
+        if (
+            currentStatus === DeliveryStatus.OUT_FOR_DELIVERY &&
+            deliveryStatus !== DeliveryStatus.DELIVERED
+        ) {
+            throw new BadRequestException(
+                'Order must be delivered next',
+            );
+        }
+
+        order.deliveryStatus = deliveryStatus;
+
+        const updatedOrder = await this.orderRepository.save(order);
+
+        return {
+            message: 'Delivery status updated successfully',
+            order: {
+                id: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                deliveryStatus: updatedOrder.deliveryStatus,
+            },
+        };
+    }
 }

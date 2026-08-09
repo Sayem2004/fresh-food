@@ -17,6 +17,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { AssignDeliveryDto } from './dto/assign-delivery.dto';
+import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
 
 @Controller('order')
 export class OrderController {
@@ -49,6 +51,29 @@ export class OrderController {
         );
     }
 
+    @Get('delivery/my-orders')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('DELIVERYMAN')
+    async getDeliveryOrders(
+        @Request() req,
+    ) {
+        return await this.orderService.getDeliveryOrders(
+            req.user.id,
+        );
+    }
+    @Patch('admin/:id/assign-delivery')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async assignDeliveryMan(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() assignDeliveryDto: AssignDeliveryDto,
+    ) {
+        return await this.orderService.assignDeliveryMan(
+            id,
+            assignDeliveryDto.deliveryManId,
+        );
+    }
+
     @Get(':id')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('CUSTOMER')
@@ -62,22 +87,37 @@ export class OrderController {
         );
     }
     @Get('admin/all')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
-async getAllOrders() {
-    return await this.orderService.getAllOrders();
-}
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async getAllOrders() {
+        return await this.orderService.getAllOrders();
+    }
 
-@Patch('admin/:id/status')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
-async updateOrderStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateOrderStatusDto: UpdateOrderStatusDto,
-) {
-    return await this.orderService.updateOrderStatus(
-        id,
-        updateOrderStatusDto.status,
-    );
-}
+    @Patch('admin/:id/status')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async updateOrderStatus(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() updateOrderStatusDto: UpdateOrderStatusDto,
+    ) {
+        return await this.orderService.updateOrderStatus(
+            id,
+            updateOrderStatusDto.status,
+        );
+    }
+
+    @Patch('delivery/:id/status')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('DELIVERYMAN')
+    async updateDeliveryStatus(
+        @Request() req,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() updateDeliveryStatusDto: UpdateDeliveryStatusDto,
+    ) {
+        return await this.orderService.updateDeliveryStatus(
+            req.user.id,
+            id,
+            updateDeliveryStatusDto.deliveryStatus,
+        );
+    }
 }
