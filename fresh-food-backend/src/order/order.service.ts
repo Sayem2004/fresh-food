@@ -19,6 +19,8 @@ import { PaymentStatus } from './enums/payment-status.enum';
 import { DeliveryStatus } from './enums/delivery-status.enum';
 import { Product } from '../product/entities/product.entity';
 import { Role } from '../common/enums/role.enum';
+import { PaymentMethod } from './enums/payment-method.enum';
+
 
 
 @Injectable()
@@ -628,6 +630,120 @@ export class OrderService {
                 orderNumber: updatedOrder.orderNumber,
                 deliveryStatus: updatedOrder.deliveryStatus,
             },
+        };
+    }
+    async receiveCashPayment(
+        deliveryManId: number,
+        orderId: number,
+        cashCollected: number,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+                deliveryManId: deliveryManId,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found or not assigned to you',
+            );
+        }
+
+        // Payment method check
+        if (order.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY) {
+            throw new BadRequestException(
+                'This order is not Cash on Delivery',
+            );
+        }
+
+        // Delivery check
+        if (order.deliveryStatus !== DeliveryStatus.DELIVERED) {
+            throw new BadRequestException(
+                'Payment can only be collected after delivery',
+            );
+        }
+
+        // Already paid check
+        if (order.paymentStatus === PaymentStatus.PAID) {
+            throw new BadRequestException(
+                'Payment has already been received',
+            );
+        }
+
+        // Amount check
+        if (cashCollected !== Number(order.totalAmount)) {
+            throw new BadRequestException(
+                `Cash amount must be ${order.totalAmount}`,
+            );
+        }
+
+        order.cashCollected = cashCollected;
+        order.paymentStatus = PaymentStatus.PAID;
+        order.paymentCollectedAt = new Date();
+
+        const updatedOrder =
+            await this.orderRepository.save(order);
+
+        return {
+            message: 'Cash payment received successfully',
+            payment: {
+                orderId: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                paymentMethod: updatedOrder.paymentMethod,
+                paymentStatus: updatedOrder.paymentStatus,
+                cashCollected: updatedOrder.cashCollected,
+                paymentCollectedAt:
+                    updatedOrder.paymentCollectedAt,
+            },
+        };
+    }
+    async getDeliveryManCashBalance(deliveryManId: number) {
+        const result = await this.orderRepository
+            .createQueryBuilder('order')
+            .select('COALESCE(SUM(order.cashCollected), 0)', 'cashBalance')
+            .where('order.deliveryManId = :deliveryManId', {
+                deliveryManId,
+            })
+            .andWhere('order.paymentMethod = :paymentMethod', {
+                paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+            })
+            .andWhere('order.paymentStatus = :paymentStatus', {
+                paymentStatus: PaymentStatus.PAID,
+            })
+            .getRawOne();
+
+        return {
+            message: 'Cash balance retrieved successfully',
+            cashBalance: Number(result.cashBalance),
+        };
+    }
+    async getDeliveryManCashHistory(deliveryManId: number) {
+        const orders = await this.orderRepository.find({
+            where: {
+                deliveryManId,
+                paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+                paymentStatus: PaymentStatus.PAID,
+            },
+            select: {
+                id: true,
+                orderNumber: true,
+                totalAmount: true,
+                cashCollected: true,
+                paymentCollectedAt: true,
+            },
+            order: {
+                paymentCollectedAt: 'DESC',
+            },
+        });
+
+        return {
+            message: 'Cash collection history retrieved successfully',
+            totalCollected: orders.reduce(
+                (sum, order) => sum + Number(order.cashCollected),
+                0,
+            ),
+            orders,
         };
     }
 }
