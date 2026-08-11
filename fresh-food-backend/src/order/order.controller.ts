@@ -19,6 +19,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { AssignDeliveryDto } from './dto/assign-delivery.dto';
 import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
+import { PaymentReceivedDto } from './dto/payment-received.dto';
 
 @Controller('order')
 export class OrderController {
@@ -120,4 +121,37 @@ export class OrderController {
             updateDeliveryStatusDto.deliveryStatus,
         );
     }
+
+    @Patch('delivery/:id/payment')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('DELIVERYMAN')
+    async receiveCashPayment(
+        @Request() req,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() paymentReceivedDto: PaymentReceivedDto,
+    ) {
+        return await this.orderService.receiveCashPayment(
+            req.user.id,
+            id,
+            paymentReceivedDto.cashCollected,
+        );
+    }
+    @Get('delivery/my-cash')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('DELIVERYMAN')
+    async getMyCashBalance(@Request() req) {
+        return await this.orderService.getDeliveryManCashBalance(
+            req.user.id,
+        );
+    }
+    @Get('delivery/cash-history')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('DELIVERYMAN')
+    async getCashHistory(@Request() req) {
+        return await this.orderService.getDeliveryManCashHistory(
+            req.user.id,
+        );
+    }
+
+
 }
