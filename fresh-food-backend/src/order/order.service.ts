@@ -746,4 +746,70 @@ export class OrderService {
             orders,
         };
     }
+
+    async confirmOnlinePayment(
+        userId: number,
+        orderId: number,
+        paymentMethod: PaymentMethod,
+        transactionId: string,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+                user: {
+                    id: userId,
+                },
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found',
+            );
+        }
+
+        // Only BKASH / NAGAD
+        if (
+            paymentMethod !== PaymentMethod.BKASH &&
+            paymentMethod !== PaymentMethod.NAGAD
+        ) {
+            throw new BadRequestException(
+                'Invalid online payment method',
+            );
+        }
+
+        // Check order payment method
+        if (order.paymentMethod !== paymentMethod) {
+            throw new BadRequestException(
+                'Payment method does not match the order',
+            );
+        }
+
+        // Already paid
+        if (order.paymentStatus === PaymentStatus.PAID) {
+            throw new BadRequestException(
+                'Payment has already been completed',
+            );
+        }
+
+        order.paymentStatus = PaymentStatus.PAID;
+        order.transactionId = transactionId;
+        order.paymentCollectedAt = new Date();
+
+        const updatedOrder =
+            await this.orderRepository.save(order);
+
+        return {
+            message: 'Online payment confirmed successfully',
+            payment: {
+                orderId: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                paymentMethod: updatedOrder.paymentMethod,
+                paymentStatus: updatedOrder.paymentStatus,
+                transactionId: updatedOrder.transactionId,
+                paymentCollectedAt:
+                    updatedOrder.paymentCollectedAt,
+            },
+        };
+    }
 }
