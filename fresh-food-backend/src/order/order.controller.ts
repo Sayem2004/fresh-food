@@ -20,6 +20,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { AssignDeliveryDto } from './dto/assign-delivery.dto';
 import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
 import { PaymentReceivedDto } from './dto/payment-received.dto';
+import { ConfirmOnlinePaymentDto } from './dto/confirm-online-payment.dto';
 
 @Controller('order')
 export class OrderController {
@@ -150,6 +151,21 @@ export class OrderController {
     async getCashHistory(@Request() req) {
         return await this.orderService.getDeliveryManCashHistory(
             req.user.id,
+        );
+    }
+    @Patch(':id/confirm-payment')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('CUSTOMER')
+    async confirmOnlinePayment(
+        @Request() req,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() confirmOnlinePaymentDto: ConfirmOnlinePaymentDto,
+    ) {
+        return await this.orderService.confirmOnlinePayment(
+            req.user.id,
+            id,
+            confirmOnlinePaymentDto.paymentMethod,
+            confirmOnlinePaymentDto.transactionId,
         );
     }
 
