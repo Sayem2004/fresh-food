@@ -169,5 +169,44 @@ export class OrderController {
         );
     }
 
+    @Get(':id/tracking')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('CUSTOMER')
+    async getOrderTracking(
+        @Request() req,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return await this.orderService.getOrderTracking(
+            req.user.id,
+            id,
+        );
+    }
+    @Patch(':id/cancel')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('CUSTOMER')
+    async cancelOrder(
+        @Request() req,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return await this.orderService.cancelOrder(
+            req.user.id,
+            id,
+        );
+    }
+    @Get('employee/orders')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('EMPLOYEE')
+    async getEmployeeOrders() {
+        return await this.orderService.getEmployeeOrders();
+    }
+    @Patch('employee/:id/process')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('EMPLOYEE')
+    async processOrder(
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return await this.orderService.processOrder(id);
+    }
+
 
 }
