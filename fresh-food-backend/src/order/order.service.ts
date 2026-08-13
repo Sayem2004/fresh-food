@@ -289,9 +289,7 @@ export class OrderService {
                 },
             },
             relations: {
-                items: {
-                    product: true,
-                },
+                items: true,
             },
             order: {
                 createdAt: 'DESC',
@@ -314,18 +312,14 @@ export class OrderService {
                 totalAmount: order.totalAmount,
                 shippingAddress: order.shippingAddress,
                 createdAt: order.createdAt,
-
-                items: order.items.map((item) => ({
-                    id: item.id,
-                    productName: item.productName,
-                    price: item.price,
-                    quantity: item.quantity,
-                    subtotal: item.subtotal,
-                })),
+                items: order.items,
             })),
         };
     }
-    async getOrderById(userId: number, orderId: number) {
+    async getOrderById(
+        userId: number,
+        orderId: number,
+    ) {
         const order = await this.orderRepository.findOne({
             where: {
                 id: orderId,
@@ -334,9 +328,7 @@ export class OrderService {
                 },
             },
             relations: {
-                items: {
-                    product: true,
-                },
+                items: true,
             },
         });
 
@@ -352,29 +344,16 @@ export class OrderService {
                 id: order.id,
                 orderNumber: order.orderNumber,
                 status: order.status,
-
                 paymentMethod: order.paymentMethod,
                 paymentStatus: order.paymentStatus,
-
                 deliveryStatus: order.deliveryStatus,
-
                 subtotal: order.subtotal,
                 discount: order.discount,
                 shippingCost: order.shippingCost,
                 totalAmount: order.totalAmount,
-
                 shippingAddress: order.shippingAddress,
-
                 createdAt: order.createdAt,
-                updatedAt: order.updatedAt,
-
-                items: order.items.map((item) => ({
-                    id: item.id,
-                    productName: item.productName,
-                    price: item.price,
-                    quantity: item.quantity,
-                    subtotal: item.subtotal,
-                })),
+                items: order.items,
             },
         };
     }
@@ -448,7 +427,85 @@ export class OrderService {
             );
         }
 
-        order.status = status;
+        const currentStatus = order.status;
+
+        // Already cancelled
+        if (currentStatus === OrderStatus.CANCELLED) {
+            throw new BadRequestException(
+                'Cancelled order cannot be updated',
+            );
+        }
+
+        // Already delivered
+        if (currentStatus === OrderStatus.DELIVERED) {
+            throw new BadRequestException(
+                'Delivered order cannot be updated',
+            );
+        }
+
+        // Cancel order
+        if (status === OrderStatus.CANCELLED) {
+            if (
+                currentStatus !== OrderStatus.PENDING &&
+                currentStatus !== OrderStatus.CONFIRMED
+            ) {
+                throw new BadRequestException(
+                    'Order cannot be cancelled at this stage',
+                );
+            }
+
+            order.status = OrderStatus.CANCELLED;
+        }
+
+        // Normal status flow
+        else if (
+            currentStatus === OrderStatus.PENDING &&
+            status !== OrderStatus.CONFIRMED
+        ) {
+            throw new BadRequestException(
+                'Order must be confirmed first',
+            );
+        }
+
+        else if (
+            currentStatus === OrderStatus.CONFIRMED &&
+            status !== OrderStatus.PROCESSING
+        ) {
+            throw new BadRequestException(
+                'Order must be processed next',
+            );
+        }
+
+        else if (
+            currentStatus === OrderStatus.PROCESSING &&
+            status !== OrderStatus.SHIPPED
+        ) {
+            throw new BadRequestException(
+                'Order must be shipped next',
+            );
+        }
+
+        else if (
+            currentStatus === OrderStatus.SHIPPED &&
+            status !== OrderStatus.OUT_FOR_DELIVERY
+        ) {
+            throw new BadRequestException(
+                'Order must be out for delivery next',
+            );
+        }
+
+        else if (
+            currentStatus === OrderStatus.OUT_FOR_DELIVERY &&
+            status !== OrderStatus.DELIVERED
+        ) {
+            throw new BadRequestException(
+                'Order must be delivered next',
+            );
+        }
+
+        else {
+            order.status = status;
+        }
 
         const updatedOrder =
             await this.orderRepository.save(order);
@@ -620,6 +677,10 @@ export class OrderService {
         }
 
         order.deliveryStatus = deliveryStatus;
+
+        if (deliveryStatus === DeliveryStatus.DELIVERED) {
+            order.status = OrderStatus.DELIVERED;
+        }
 
         const updatedOrder = await this.orderRepository.save(order);
 
@@ -809,6 +870,196 @@ export class OrderService {
                 transactionId: updatedOrder.transactionId,
                 paymentCollectedAt:
                     updatedOrder.paymentCollectedAt,
+            },
+        };
+    }
+
+    async getOrderTracking(
+        userId: number,
+        orderId: number,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+                user: {
+                    id: userId,
+                },
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found',
+            );
+        }
+
+        return {
+            message: 'Order tracking retrieved successfully',
+            order: {
+                id: order.id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                deliveryStatus: order.deliveryStatus,
+            },
+            tracking: [
+                {
+                    status: 'ORDER_PLACED',
+                    completed: true,
+                },
+                {
+                    status: 'PAYMENT_COMPLETED',
+                    completed:
+                        order.paymentStatus === PaymentStatus.PAID,
+                },
+                {
+                    status: 'DELIVERY_ASSIGNED',
+                    completed:
+                        order.deliveryStatus !==
+                        DeliveryStatus.PENDING,
+                },
+                {
+                    status: 'PICKED_UP',
+                    completed:
+                        order.deliveryStatus ===
+                        DeliveryStatus.PICKED_UP ||
+                        order.deliveryStatus ===
+                        DeliveryStatus.OUT_FOR_DELIVERY ||
+                        order.deliveryStatus ===
+                        DeliveryStatus.DELIVERED,
+                },
+                {
+                    status: 'OUT_FOR_DELIVERY',
+                    completed:
+                        order.deliveryStatus ===
+                        DeliveryStatus.OUT_FOR_DELIVERY ||
+                        order.deliveryStatus ===
+                        DeliveryStatus.DELIVERED,
+                },
+                {
+                    status: 'DELIVERED',
+                    completed:
+                        order.deliveryStatus ===
+                        DeliveryStatus.DELIVERED,
+                },
+            ],
+        };
+    }
+    async cancelOrder(
+        userId: number,
+        orderId: number,
+    ) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+                user: {
+                    id: userId,
+                },
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found',
+            );
+        }
+
+        if (
+            order.status !== OrderStatus.PENDING &&
+            order.status !== OrderStatus.CONFIRMED
+        ) {
+            throw new BadRequestException(
+                'Order cannot be cancelled at this stage',
+            );
+        }
+
+        order.status = OrderStatus.CANCELLED;
+
+        const updatedOrder =
+            await this.orderRepository.save(order);
+
+        return {
+            message: 'Order cancelled successfully',
+            order: {
+                id: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                status: updatedOrder.status,
+                paymentStatus: updatedOrder.paymentStatus,
+                deliveryStatus: updatedOrder.deliveryStatus,
+            },
+        };
+    }
+
+    async getEmployeeOrders() {
+        const orders = await this.orderRepository.find({
+            relations: {
+                items: true,
+                user: true,
+            },
+            order: {
+                createdAt: 'DESC',
+            },
+        });
+
+        return {
+            message: 'Employee orders retrieved successfully',
+            totalOrders: orders.length,
+            orders: orders.map((order) => ({
+                id: order.id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                deliveryStatus: order.deliveryStatus,
+                subtotal: order.subtotal,
+                discount: order.discount,
+                shippingCost: order.shippingCost,
+                totalAmount: order.totalAmount,
+                shippingAddress: order.shippingAddress,
+                createdAt: order.createdAt,
+                items: order.items,
+                customer: {
+                    id: order.user.id,
+                    name: order.user.name,
+                    email: order.user.email,
+                    phone: order.user.phone,
+                },
+            })),
+        };
+    }
+    async processOrder(orderId: number) {
+        const order = await this.orderRepository.findOne({
+            where: {
+                id: orderId,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException(
+                'Order not found',
+            );
+        }
+
+        if (order.status !== OrderStatus.CONFIRMED) {
+            throw new BadRequestException(
+                'Only confirmed orders can be processed',
+            );
+        }
+
+        order.status = OrderStatus.PROCESSING;
+
+        const updatedOrder =
+            await this.orderRepository.save(order);
+
+        return {
+            message: 'Order is now processing',
+            order: {
+                id: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                status: updatedOrder.status,
+                paymentStatus: updatedOrder.paymentStatus,
+                deliveryStatus: updatedOrder.deliveryStatus,
             },
         };
     }
