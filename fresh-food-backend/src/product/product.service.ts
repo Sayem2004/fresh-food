@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, ILike } from 'typeorm';
@@ -9,6 +10,7 @@ import { Product } from './entities/product.entity';
 import { Category } from '../category/entities/category.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+
 
 @Injectable()
 export class ProductService {
@@ -58,6 +60,28 @@ export class ProductService {
         });
 
         return await this.productRepository.save(product);
+    }
+    // Employee → View Products & Stock
+    async getEmployeeProducts() {
+        const products = await this.productRepository.find({
+            order: {
+                id: 'ASC',
+            },
+        });
+
+        return {
+            message: 'Products retrieved successfully',
+            totalProducts: products.length,
+            products: products.map((product) => ({
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                discountPrice: product.discountPrice,
+                stock: product.stock,
+                unit: product.unit,
+                status: product.status,
+            })),
+        };
     }
 
     // ===========================
@@ -234,4 +258,29 @@ export class ProductService {
 
         return products;
     }
+
+    async updateStock(id: number, stock: number) {
+    const product = await this.productRepository.findOne({
+        where: { id },
+    });
+
+    if (!product) {
+        throw new NotFoundException('Product not found');
+    }
+
+    product.stock = stock;
+
+    const updatedProduct = await this.productRepository.save(product);
+
+    return {
+        message: 'Product stock updated successfully',
+        product: {
+            id: updatedProduct.id,
+            name: updatedProduct.name,
+            stock: updatedProduct.stock,
+            unit: updatedProduct.unit,
+            status: updatedProduct.status,
+        },
+    };
+}
 }
