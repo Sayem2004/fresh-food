@@ -18,6 +18,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { UpdateStockDto } from './dto/update-stock.dto';
 
 @Controller('product')
 export class ProductController {
@@ -33,6 +34,26 @@ export class ProductController {
         @Body() createProductDto: CreateProductDto,
     ) {
         return await this.productService.create(createProductDto);
+    }
+
+    // Employee → View Products & Stock
+    @Get('employee/products')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('EMPLOYEE')
+    async getEmployeeProducts() {
+        return await this.productService.getEmployeeProducts();
+    }
+    @Patch('employee/:id/stock')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('EMPLOYEE')
+    async updateStock(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() updateStockDto: UpdateStockDto,
+    ) {
+        return await this.productService.updateStock(
+            id,
+            updateStockDto.stock,
+        );
     }
 
     // Get All Products
