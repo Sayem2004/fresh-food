@@ -13,7 +13,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
@@ -25,7 +25,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // Compare password
+    if (user.status === 'INACTIVE') {
+      throw new UnauthorizedException('Your account is inactive');
+    }
+
     const isPasswordMatched = await bcrypt.compare(
       password,
       user.password,

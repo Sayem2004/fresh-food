@@ -58,21 +58,26 @@ export class ProductController {
 
     // Get All Products
     @Get()
-    async findAll(
-        @Query('page') page = '1',
-        @Query('limit') limit = '10',
-        @Query('categoryId') categoryId?: string,
-        @Query('sort') sort = 'id',
-        @Query('order') order: 'ASC' | 'DESC' = 'ASC',
-    ) {
-        return await this.productService.findAll(
-            Number(page),
-            Number(limit),
-            categoryId ? Number(categoryId) : undefined,
-            sort,
-            order,
-        );
-    }
+@Get()
+async findAll(
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('status') status?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('sort') sort = 'id',
+    @Query('order') order: 'ASC' | 'DESC' = 'ASC',
+) {
+    return await this.productService.findAll(
+        search,
+        categoryId ? Number(categoryId) : undefined,
+        status,
+        Number(page),
+        Number(limit),
+        sort,
+        order,
+    );
+}
 
     // Search Product by Name
     @Get('search')
