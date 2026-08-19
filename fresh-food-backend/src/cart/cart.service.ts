@@ -109,12 +109,18 @@ export class CartService {
         }
 
         // Create Cart
+        const finalPrice =
+            product.discountPrice !== null &&
+                product.discountPrice !== undefined
+                ? Number(product.discountPrice)
+                : Number(product.price);
+
         const cart =
             this.cartRepository.create({
                 user,
                 product,
                 quantity,
-                priceAtAdd: Number(product.price),
+                priceAtAdd: finalPrice,
             });
 
         const savedCart =
@@ -354,21 +360,15 @@ export class CartService {
         let totalItems = carts.length;
         let totalQuantity = 0;
         let subtotal = 0;
-        let discount = 0;
 
         for (const cart of carts) {
             totalQuantity += cart.quantity;
 
             subtotal +=
                 Number(cart.priceAtAdd) * cart.quantity;
-
-            discount +=
-                (Number(cart.priceAtAdd) -
-                    Number(cart.product.discountPrice)) *
-                cart.quantity;
         }
 
-        const grandTotal = subtotal - discount;
+        const grandTotal = subtotal;
 
         return {
             message: 'Cart summary retrieved successfully',
@@ -376,7 +376,6 @@ export class CartService {
                 totalItems,
                 totalQuantity,
                 subtotal,
-                discount,
                 grandTotal,
             },
         };
@@ -385,7 +384,7 @@ export class CartService {
 
 
 
-    
+
     async checkoutValidation(userId: number) {
         const carts = await this.cartRepository.find({
             where: {
@@ -432,8 +431,14 @@ export class CartService {
                 );
             }
 
+            const currentPrice =
+                product.discountPrice !== null &&
+                    product.discountPrice !== undefined
+                    ? Number(product.discountPrice)
+                    : Number(product.price);
+
             if (
-                Number(product.price) !==
+                currentPrice !==
                 Number(cart.priceAtAdd)
             ) {
                 issues.push(
